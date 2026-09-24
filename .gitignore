@@ -1,0 +1,17 @@
+node_modules/
+dist/
+dist-ssr/
+*.local
+*.tsbuildinfo
+
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+
+*.log
+npm-debug.log*
+
+_bmad/*
+.claude
+log_utils.py
+personal-finance-planner.pdf

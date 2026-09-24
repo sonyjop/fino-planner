@@ -1,0 +1,71 @@
+/* Design tokens — approximated from the source PDF; adjust during visual QA. */
+:root {
+  --color-bg: #f3f5fa;
+  --color-surface: #ffffff;
+  --color-surface-dark: #12172b;
+
+  --color-primary: #3355ee;
+  --color-primary-dark: #2a44c4;
+
+  --color-text: #14161f;
+  --color-text-muted: #6b7280;
+  --color-text-on-primary: #ffffff;
+
+  --color-income: #1a9e5c;
+  --color-expense: #e8792b;
+
+  --color-pill-planned-bg: #e3e8ff;
+  --color-pill-planned-text: #3355ee;
+  --color-pill-partial-bg: #fbe6c8;
+  --color-pill-partial-text: #b06a12;
+  --color-pill-paid-bg: #d9f2e3;
+  --color-pill-paid-text: #1a9e5c;
+
+  --color-status-active: #1a9e5c;
+  --color-status-paused: #b06a12;
+  --color-status-stopped: #6b7280;
+
+  --radius-card: 18px;
+  --radius-pill: 999px;
+  --radius-control: 12px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+
+  --shadow-card: 0 1px 2px rgba(20, 22, 31, 0.06), 0 4px 12px rgba(20, 22, 31, 0.04);
+
+  /* iOS Safari safe-area insets, used by AppShell/BottomNav */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
