@@ -1,0 +1,22 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.originLink {
+  align-self: flex-start;
+  border: none;
+  background: none;
+  color: var(--color-primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+}
+
+.error {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-expense);
+}

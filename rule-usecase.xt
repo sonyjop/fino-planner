@@ -1,0 +1,48 @@
+A) Rule can have statuses
+active/expired/cancelled/deprecated
+active - is created and can be considered for all future month projections.
+expired - end date over and hence not to be included for projections
+cancelled - user cancelled the rule
+deprectaed - new version is available and projections possible only if the occurence does not overlap into newer versions projection.
+[when a newer version is created a user may say that the newer version start date after 4 months and if the original rule repeat = Monthly then 
+it should be projected for those gap period until the start date for new version. so effectively when a new version is created and a start date is mentioned 
+for it then the end date for the old version falls just before it.]
+B) rule should have configuratgion to mark whether it is never ending or if here is an end date.
+C) Repeat to have enumeration = {monthly, quarterly, yearly} 
+1)Action: configure a new rule
+name=netflix
+amount=1000
+category=Lifestyle
+Type=Expense
+Repeats=Monthly
+Day of Month = 1
+Effective From=26-09-2026
+
+This create s rule with version = v1.
+result: planned entry for 1-Oct and onwards every Month
+
+2) Action - Editing rule name = netflix
+change the amount = 1100
+or Repeats = Yearly
+or Day of Month = 5 (for instance)
+
+result:
+new rule version is created as V2 with status = active
+rule version v1 status=deprecated
+every month will start using these rule for projections.
+
+3) Action: Edit Rule 
+name=netflix-new
+or Category = Housing
+or type = income
+
+
+Result:
+creates another rule and not a version.
+the parent rule version remains as cancelled.
+all unplanned items for each month will be driven from updated active rules again.
+in this case the parent rule instances will be removed and new rule with active status is kept.
+
+
+Note: an end date for rule will normally be marked only if a new version created or the rule
+ status changed to cancelled

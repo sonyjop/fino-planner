@@ -1,0 +1,43 @@
+.pill {
+  display: inline-block;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.planned {
+  background: var(--color-pill-planned-bg);
+  color: var(--color-pill-planned-text);
+}
+
+.partial {
+  background: var(--color-pill-partial-bg);
+  color: var(--color-pill-partial-text);
+}
+
+.paid {
+  background: var(--color-pill-paid-bg);
+  color: var(--color-pill-paid-text);
+}
+
+.active {
+  background: var(--color-pill-paid-bg);
+  color: var(--color-status-active);
+}
+
+.paused {
+  background: var(--color-pill-partial-bg);
+  color: var(--color-status-paused);
+}
+
+.stopped {
+  background: #eceef3;
+  color: var(--color-status-stopped);
+}
+
+.neutral {
+  background: #eceef3;
+  color: var(--color-text-muted);
+}

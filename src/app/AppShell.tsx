@@ -1,25 +1,38 @@
-import { useState } from 'react';
+import { useEffect } from 'react';
+import CashflowScreen from '../screens/Cashflow/CashflowScreen';
+import RulesScreen from '../screens/Rules/RulesScreen';
+import { useMetadataStore } from '../stores/metadataStore';
+import { useUiStore, type AppTab } from '../stores/uiStore';
 import styles from './AppShell.module.css';
+import SheetHost from './SheetHost';
 
-type Tab = 'cashflow' | 'rules' | 'masterData' | 'annualSummary';
-
-const TABS: { id: Tab; label: string }[] = [
+const TABS: { id: AppTab; label: string }[] = [
   { id: 'cashflow', label: 'Cashflow' },
   { id: 'rules', label: 'Rules' },
   { id: 'masterData', label: 'Master Data' },
   { id: 'annualSummary', label: 'Summary' },
 ];
 
-// Placeholder shell — real screens (Cashflow/Rules/MasterData/AnnualSummary) land in Phase 2.
+// Master Data / Annual Summary screens land in their own phases; Cashflow and Rules are real.
 export default function AppShell() {
-  const [activeTab, setActiveTab] = useState<Tab>('cashflow');
+  const activeTab = useUiStore((s) => s.activeTab);
+  const setActiveTab = useUiStore((s) => s.setActiveTab);
+  const loadMetadata = useMetadataStore((s) => s.load);
+
+  useEffect(() => {
+    loadMetadata(); // seeds Master Data on first run, no-op afterward
+  }, [loadMetadata]);
 
   return (
     <div className={styles.shell}>
       <main className={styles.content}>
-        <p className={styles.placeholder}>
-          {TABS.find((t) => t.id === activeTab)?.label} screen — built in Phase 2.
-        </p>
+        {activeTab === 'cashflow' && <CashflowScreen />}
+        {activeTab === 'rules' && <RulesScreen />}
+        {activeTab !== 'cashflow' && activeTab !== 'rules' && (
+          <p className={styles.placeholder}>
+            {TABS.find((t) => t.id === activeTab)?.label} screen — built in a later phase.
+          </p>
+        )}
       </main>
 
       <nav className={styles.bottomNav}>
@@ -33,6 +46,8 @@ export default function AppShell() {
           </button>
         ))}
       </nav>
+
+      <SheetHost />
     </div>
   );
 }

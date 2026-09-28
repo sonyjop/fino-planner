@@ -1,0 +1,31 @@
+.button {
+  width: 100%;
+  padding: var(--space-3);
+  border-radius: var(--radius-control);
+  border: none;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.primary {
+  background: var(--color-primary);
+  color: var(--color-text-on-primary);
+}
+
+.secondary {
+  background: var(--color-surface);
+  color: var(--color-primary);
+  border: 1px solid #d7dbe6;
+}
+
+.destructive {
+  background: var(--color-surface);
+  color: var(--color-expense);
+  border: 1px solid #f2d3bd;
+}

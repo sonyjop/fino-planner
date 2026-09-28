@@ -1,10 +1,12 @@
+import type { RuleStatus } from '../../models/RecurringRule';
 import { db } from './db';
 import type { StoredRuleRecord } from './StoredRecords';
 
 /**
  * Raw CRUD over the encrypted-at-rest record shape — no encryption logic here.
  * Wrapped by EncryptingRuleRepository, which is what Services actually use.
- * Insert-only by convention: rules are immutable/versioned (models/RecurringRule.ts).
+ * Insert-only for content: rules are immutable/versioned (models/RecurringRule.ts) —
+ * updateStatus() is the one deliberate exception (architecture.md §2.4).
  */
 export class DexieRuleRepository {
   async getAll(): Promise<StoredRuleRecord[]> {
@@ -22,6 +24,11 @@ export class DexieRuleRepository {
 
   async save(record: StoredRuleRecord): Promise<void> {
     await db.rules.put(record);
+  }
+
+  /** `status` is a clear (unencrypted) column — this never touches cipherPayload/iv. */
+  async updateStatus(id: string, status: RuleStatus): Promise<void> {
+    await db.rules.update(id, { status, updatedAt: new Date().toISOString() });
   }
 
   async delete(id: string): Promise<void> {

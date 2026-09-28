@@ -1,0 +1,36 @@
+.selector {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+
+.labelWrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.label {
+  font-weight: 600;
+}
+
+/* Transparent native month picker, sized to cover the label — tapping the label opens
+   the platform's date/month picker (a proper wheel on iOS Safari) instead of only
+   allowing one-month-at-a-time chevron navigation. */
+.monthInput {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.navButton {
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: var(--space-2);
+  display: flex;
+}

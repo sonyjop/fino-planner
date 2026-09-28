@@ -1,0 +1,58 @@
+Basic
+1. want an app for financial planning.
+2. need major things like Cashflow, Rules, MasterData and a annual summary screens.
+
+Cashflow
+1. need monthly view with year month key selector from left/right navigation and calendar too.
+2. need summary - actuals v/s planned expense and income
+3. need section for planned transactions with provision to show planned items based on rules and adhoc planning as well.
+4. when planned items are marked paid then it moves to completed transactions.
+5. there should be provision for adding completed transactions directly too.
+6. these edits should happen based on a bottom sheet of the app.
+7. transaction status can move freely between planned and actual (completed) in either direction - not one directional. so marking as paid can be undone back to planned, and a transaction can also be created directly as already-completed. one unified control for this instead of a one-way mark-as-paid only.
+
+Rules
+1. need income/expense rules with frequency, day of month, start date, lest execution date et al 
+2. rules should be versioned such that any edits to amount, date, frequency et al should create a new version.
+3. rule versions does not increase if name, type, category changes instead it will become a new rule.
+4. rules are immuatable and as mentioned above edits results in new version or new rule itself.
+old versions are automatically stopped status.
+5. rules can show previous versions for understanding from the current version. like when bottom sheet opens it can show old version ref and on clicking old version sheets can also show up.
+
+CashFlow and Rule relation
+1. if a rule based planned item is completed then that transaction must have a link to the rule.
+2. if rule version changes then whatever transactions are completed will remain and new planned/completed transaction will be effected based on new rule
+2b. clarified: this protection is for completed transactions only. a transaction still in planned status for a month that the new version's effective/start date covers should update to the new version (amount etc, and re-link to the new version) - not stay frozen on the old version. if the new version's effective date is after that month, the old version's terms remain for that month instead.
+3. a rule executed on a frequency is never repeated on that frequency itself even if a new version appears.
+4. a new rule version and old rule version will be clearly seoparated by end date and new start date.
+
+MasterData
+1. need to have categories - which i should eb able to adding
+2. some basic categories to be prepopuilated
+2. each categories should have enumerated list availabe ad should allow addition.
+
+Yearly summary
+1. show yearly sumnmary for financial year. l
+2. show what is the projected yearly income and spend based on runtime compute
+3. show what is the actual so far based on runtime compute.
+
+Data Strategy
+1. save data on browser local - Dexie.
+2. need to ahve a permanenet data cloud storage at cloud with google firebase.
+3. it is always like synch with last updated time stamp.
+4. whatever upserted in local then goes to firebase as well.
+5. if data is updated thru multipl channels - e.g. iphone browser and mac book browser then last updated will successful.
+6. do a fire and forget for data writes.
+7. for a clean state app, when the firebase oart is implemented, the data will be fetched from firebase and local is populated.
+8. local data store will evict all data other than current financial year. will store all rules and master data everytime.
+
+
+Integrations
+will think about integrating with banks or external systems later for transaction recording. so leave provisions but no implementations right now.
+
+
+Note: whatever develope so far (till 1000 AM 26-Sep-2026) are good. however, if it requirs changes after our brain storming you can consider for refactoring.
+I want you to brainstorm correctly before we start developing.
+I want you to tell me all posiibiities for status transitioning of cashflow transactions and rule statuses.
+I want you to ahve perfect understanding so ask questions until.
+do you want to create use cases? then do it I will answer your queries.

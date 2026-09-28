@@ -41,7 +41,9 @@ Every transaction carries two things that decide planned vs. actual:
 - **`date`** — the operative date. Defaults to *today* at entry time unless changed. Drives month/year bucketing.
 - **`statusKind`** — a fixed, code-level marker: `'planned' | 'actual'`. Structural — the dashboard's balance math and Upcoming/Completed split depend on it.
 
-`statusLabelId` is a separate, user-customizable display label (Planned / Partial / Paid / anything you add) sourced from Master Data. It drives the pill text/color only, never the math.
+`statusKind` is **freely bidirectional**, via one unified control in the transaction sheet — not a one-way "mark as paid." It can be set directly at creation time too (logging something already paid skips the planned step entirely), and an already-`actual` transaction can be moved back to `planned` (undo). basic-usecases.txt Cashflow #7.
+
+`statusLabelId` is a separate, purely cosmetic display label (Planned / Partial / Paid / anything you add) sourced from Master Data. It drives the pill text/color only, never the math or bucketing — "Partial" in particular carries **no** amount-tracking behavior; it's just a tag a transaction can wear while still `planned`.
 
 ### 2.2 Master Data — enumeration groups
 
@@ -94,53 +96,71 @@ interface Transaction {
 }
 ```
 
-### 2.4 Recurring Rule — versioned, immutable
+### 2.4 Recurring Rule — versioned content, mutable status
 
-A rule is never updated in place. Every edit produces a new row. Two outcomes, depending on *what* changed:
+**Content** (name, description, type, category, amount, schedule, endDate) is immutable — every content edit produces a new row, never an in-place update. **Status** is the one deliberate exception: pause/resume/cancel mutate the current row's `status` **in place**, with no new version, no history entry (rule-usecase.xt #2 lists only amount/date/frequency as version-triggering — status isn't one of them).
 
-- **New version, same lineage** — amount, schedule (`dayOfMonth`/cadence), or `status` changed. Gets the next `version` number, same `ruleGroupId`, `effectiveFrom` = the date you made the change (or a date you pick). The prior version's `effectiveTo` is set to that same date (exclusive) and `supersedesId` links back.
-- **New lineage entirely** — **`name`, `categoryId`, or `type`** changed (confirmed). Gets a brand-new `ruleGroupId`, `version: 1`, no `supersedesId`. `description` changing alone is cosmetic — non-breaking, versions in place like amount/schedule. The old lineage's last version keeps its `effectiveTo` open — it simply stops being materialized once you pause/stop it, or coexists if you intend two related-but-distinct rules.
+**Status** (`RuleStatus`):
+
+| Status | Meaning | Set by |
+|---|---|---|
+| `active` | Normal — contributes computed occurrences going forward. | Create; Resume |
+| `paused` | Temporarily suspended — contributes nothing until resumed. | User (Pause) |
+| `cancelled` | Terminal — user-cancelled, *or* the automatic result of a chain-break's old lineage. Contributes nothing, ever again. | User (Cancel); automatic on chain-break |
+| `deprecated` | Automatic — superseded by a newer version in the *same* lineage. Still contributes occurrences for any "gap" months its window covers that the newer version doesn't reach yet. | Automatic on an in-lineage revision |
+| `expired` | Automatic, stored (not merely computed) — today has passed this rule's own `endDate`. Informational: the `endDate` itself already bounds which months produce an occurrence (§2.5), so this status doesn't need to gate anything further. | `RuleService.list()`, lazily, the first time it notices |
+
+Two outcomes for a *content* edit, depending on what changed:
+
+- **New version, same lineage** — amount or schedule (`dayOfMonth`/cadence) changed. Gets the next `version` number, same `ruleGroupId`, `effectiveFrom` = the date you pick (defaults to today). The superseded row's `effectiveTo` is set to that same date (exclusive), `supersedesId` links back, **and its `status` is force-set to `deprecated`** regardless of what it was.
+- **New lineage entirely** — **`name`, `categoryId`, or `type`** changed. Gets a brand-new `ruleGroupId`, `version: 1`, no `supersedesId`, no `effectiveTo` (a separate lineage, not a closed date range). The new lineage's initial `status` **inherits** the old lineage's pre-supersede status. The **old** lineage's current row is **force-set to `cancelled`** — terminal, unlike `deprecated`. `description` changing alone is cosmetic — non-breaking, versions in place like amount/schedule.
 
 ```ts
 interface RecurringRule {
-  id: string;                   // unique per version
-  ruleGroupId: string;          // stable across versions in one lineage
-  version: number;               // 1-based within the group
-  effectiveFrom: string;         // ISO date — when this version starts applying
-  effectiveTo?: string;          // ISO date, exclusive — set once superseded
-  supersedesId?: string;         // previous version's id, same group
+  id: string;                    // unique per version
+  ruleGroupId: string;           // stable across versions in one lineage
+  version: number;                // 1-based within the group
+  effectiveFrom: string;          // ISO date — when this version starts applying
+  effectiveTo?: string;           // ISO date, exclusive — set once superseded within the lineage
+  supersedesId?: string;          // previous version's id, same group
 
-  name: string;                  // chain-breaking if changed
+  name: string;                   // chain-breaking if changed
   description?: string;
-  type: 'income' | 'expense';     // chain-breaking if changed
-  categoryId: string;              // chain-breaking if changed ("tag")
+  type: 'income' | 'expense';      // chain-breaking if changed
+  categoryId: string;               // chain-breaking if changed ("tag")
 
-  amount: number;                  // versions, doesn't break chain
-  repeats: 'monthly' | 'weekly' | 'yearly';
-  dayOfMonth?: number;              // for 'monthly'
-  dayOfWeek?: number;                // for 'weekly'
-  monthOfYear?: number;               // for 'yearly', paired with dayOfMonth
+  amount: number;                   // versions, doesn't break chain
+  repeats: 'monthly' | 'quarterly' | 'yearly';
+  dayOfMonth?: number;               // for 'monthly' and 'quarterly'
+  monthOfYear?: number;               // 'yearly': fires in this month. 'quarterly': start month (fires every 3rd month from here)
   startDate: string;
-  status: 'active' | 'paused' | 'stopped';   // versions, doesn't break chain
+  endDate?: string;                   // undefined = never-ending; bounds which months produce an occurrence
+  status: 'active' | 'paused' | 'cancelled' | 'deprecated' | 'expired';
 
   createdAt: string;
   updatedAt: string;
 }
 ```
 
-`RuleRepository` exposes only `save` (always an insert of a new row) and reads — no update method exists, enforcing immutability at the interface level.
+`RuleRepository` exposes `save` (always an insert of a new row for content) and reads, plus exactly one mutation: `updateStatus(id, status)` — the single, narrow exception to immutability, scoped to that one field. `status` is one of the *clear* (unencrypted) columns on the stored record (§8.1), so this mutation never touches `cipherPayload`.
 
-### 2.5 Rule execution → traceable transactions
+### 2.5 Rule execution — computed, never stored
 
-On month select, `RuleEngineService.materializeMonth(year, month)` runs:
+**Rule-derived planned occurrences are never persisted.** Every time a month is viewed, `computeVirtualPlannedTransactions(allRuleVersions, year, month)` — a pure function, no I/O — recomputes them fresh from whatever the rules currently say. There is nothing to keep in sync, migrate, or dedupe, because nothing is ever written until something becomes concrete.
 
-1. Group rules by `ruleGroupId`.
-2. Per group, pick the version whose `[effectiveFrom, effectiveTo)` window covers the target month **and** whose `status === 'active'`.
-3. If that version's schedule fires in this month, check whether a `Transaction` with that exact `ruleId` already exists for this `monthKey` (idempotency).
-4. If missing, create one: `statusKind: 'planned'`, `ruleId` = that version's id, `ruleGroupId` set, `date` = the computed occurrence date.
-5. Completing it later flips `statusKind` to `'actual'` and updates `statusLabelId` — `ruleId`/`ruleGroupId` are never cleared.
+Per rule group, for a target month:
 
-Because step 2 pins the *version active at that month*, editing a rule today never rewrites the amount on transactions already materialized for past months.
+1. Find the version whose window covers the month: `effectiveFrom <= monthStart`, `(!effectiveTo || effectiveTo > monthStart)`, **and** `(!endDate || endDate >= monthStart)`. If none does, this group contributes nothing.
+2. If that version's `status` is `paused` or `cancelled`, contribute nothing — regardless of its window. `active`, `deprecated`, and `expired` all may contribute; `deprecated` naturally only wins the month-1 check for gap months before a newer version's `effectiveFrom`, and `expired` is already bounded by its own `endDate` in step 1, so neither needs a separate carve-out.
+3. Otherwise compute the occurrence date and emit a virtual `Transaction`: `statusKind: 'planned'`, `id: `virtual:${ruleId}:${monthKey}`` (synthetic — recognizable, deterministic, never written to Dexie), `ruleId`/`ruleGroupId` set for traceability.
+
+`TransactionService.getForMonth(year, month)` merges this with whatever's genuinely stored for the month (adhoc planned entries, and anything completed): a virtual occurrence is suppressed wherever a real row already exists for that `ruleGroupId` this month (i.e. it's already been completed).
+
+**Completing** a virtual occurrence is the *only* way it ever becomes a real row: `TransactionService.create()` is called with its `ruleId`/`ruleGroupId` carried over and `statusKind: 'actual'`. Editing a virtual occurrence without completing it isn't supported (rule-usecase.xt) — change the rule itself for future occurrences, or complete this one.
+
+This design is what makes a chain-break trivial: the old (now `cancelled`) lineage contributes nothing from the moment it's cancelled, in *any* month, so there's no double-computation risk with the new lineage — no migration, no predecessor-chain lookup, no concurrency guard needed anywhere in this path, because nothing is ever written for a still-planned occurrence in the first place. A `Transaction` only ever exists in Dexie once it's real: an adhoc entry, or something completed.
+
+**Annual Summary note**: since planned occurrences are computed, not stored, an FY aggregate (§7) may build an in-memory (never persisted) cache across the 12 months it needs, purely to avoid recomputing the same month repeatedly — never a substitute for storage.
 
 ---
 
@@ -260,7 +280,8 @@ interface TransactionRepository {
   save(tx: Transaction): Promise<void>;
   delete(id: string): Promise<void>;
 }
-// RuleRepository (save = insert-only, see 2.4), MetadataRepository follow the same shape
+// RuleRepository (save = insert-only for content, plus updateStatus — see 2.4),
+// MetadataRepository follow the same read/write shape
 ```
 
 ---

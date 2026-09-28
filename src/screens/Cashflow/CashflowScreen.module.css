@@ -1,0 +1,48 @@
+.screen {
+  position: relative;
+  padding-bottom: var(--space-6);
+}
+
+.subtitle {
+  color: var(--color-text-muted);
+  margin: -8px 0 var(--space-4);
+  font-size: 0.9rem;
+}
+
+.summaryRow {
+  display: flex;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.sectionTitle {
+  font-weight: 600;
+  margin: 0 0 var(--space-2);
+}
+
+.section {
+  margin-bottom: var(--space-5);
+}
+
+.empty {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  padding: var(--space-3) 0;
+}
+
+.fab {
+  position: fixed;
+  right: var(--space-4);
+  bottom: calc(72px + var(--safe-bottom));
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  background: var(--color-primary);
+  color: var(--color-text-on-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(51, 85, 238, 0.4);
+  cursor: pointer;
+}

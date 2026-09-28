@@ -3,6 +3,23 @@
   display: flex;
   flex-direction: column;
   padding-top: var(--safe-top);
+  background: var(--color-surface);
+  /* Makes .shell the containing block for `position: fixed` descendants (e.g. the FAB,
+     future sheets/backdrops) so they pin to the phone frame, not the whole browser
+     viewport, once the frame is centered on wider screens below. */
+  contain: layout;
+}
+
+/* Below this width we're on an actual phone (or a narrow window) — full-bleed,
+   matching the PDF's phone screens exactly. Above it (laptop/desktop), constrain
+   to a phone-width column instead of stretching edge-to-edge. */
+@media (min-width: 560px) {
+  .shell {
+    max-width: 430px;
+    margin: 0 auto;
+    min-height: 100vh;
+    box-shadow: var(--shadow-card);
+  }
 }
 
 .content {

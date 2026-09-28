@@ -1,4 +1,4 @@
-import type { RecurringRule } from '../../../models/RecurringRule';
+import type { RecurringRule, RuleStatus } from '../../../models/RecurringRule';
 import type { CryptoService } from '../../../services/CryptoService';
 import type { RuleRepository } from '../../interfaces/RuleRepository';
 import type { DexieRuleRepository } from '../DexieRuleRepository';
@@ -13,9 +13,9 @@ type EncryptedRuleFields = Pick<
   | 'amount'
   | 'repeats'
   | 'dayOfMonth'
-  | 'dayOfWeek'
   | 'monthOfYear'
   | 'startDate'
+  | 'endDate'
   | 'effectiveTo'
   | 'supersedesId'
   | 'createdAt'
@@ -57,6 +57,10 @@ export class EncryptingRuleRepository implements RuleRepository {
     await this.raw.save(await this.toStored(rule));
   }
 
+  async updateStatus(id: string, status: RuleStatus): Promise<void> {
+    await this.raw.updateStatus(id, status); // status is a clear column — no encryption involved
+  }
+
   async delete(id: string): Promise<void> {
     await this.raw.delete(id);
   }
@@ -69,9 +73,9 @@ export class EncryptingRuleRepository implements RuleRepository {
       amount: rule.amount,
       repeats: rule.repeats,
       dayOfMonth: rule.dayOfMonth,
-      dayOfWeek: rule.dayOfWeek,
       monthOfYear: rule.monthOfYear,
       startDate: rule.startDate,
+      endDate: rule.endDate,
       effectiveTo: rule.effectiveTo,
       supersedesId: rule.supersedesId,
       createdAt: rule.createdAt,
