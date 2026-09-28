@@ -1,4 +1,5 @@
 import Dexie, { type Table } from 'dexie';
+import { APP_SLUG } from '../../config/app';
 import type { MetadataGroup } from '../../models/MetadataGroup';
 import type { StoredRuleRecord, StoredTransactionRecord } from './StoredRecords';
 
@@ -22,7 +23,7 @@ export interface AuthConfigRecord {
   verificationHash: string;
 }
 
-class FinoplanDB extends Dexie {
+class FinoPlannerDB extends Dexie {
   transactions!: Table<StoredTransactionRecord, string>;
   rules!: Table<StoredRuleRecord, string>;
   metadataGroups!: Table<MetadataGroup, string>;
@@ -31,7 +32,7 @@ class FinoplanDB extends Dexie {
   authConfig!: Table<AuthConfigRecord, string>;
 
   constructor() {
-    super('finoplan');
+    super(APP_SLUG);
     this.version(1).stores({
       transactions: 'id, monthKey, year, ruleId, ruleGroupId, categoryId, statusKind, updatedAt',
       rules: 'id, ruleGroupId, status, categoryId, effectiveFrom, updatedAt',
@@ -43,4 +44,4 @@ class FinoplanDB extends Dexie {
   }
 }
 
-export const db = new FinoplanDB();
+export const db = new FinoPlannerDB();

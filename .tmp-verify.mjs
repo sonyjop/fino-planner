@@ -7,7 +7,7 @@ const browser = await chromium.launch({
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 
 await page.goto('http://localhost:5183', { waitUntil: 'networkidle' });
-await page.waitForSelector('text=Finoplan', { timeout: 10000 });
+await page.waitForSelector('text=finoPlanner', { timeout: 10000 });
 
 await page.fill('input[placeholder="Passphrase"]', 'test-passphrase-1234');
 await page.fill('input[placeholder="Confirm passphrase"]', 'test-passphrase-1234');

@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { APP_NAME } from '../../config/app';
 import { AuthService } from '../../services/AuthService';
 import styles from './UnlockScreen.module.css';
 
@@ -48,7 +49,7 @@ export default function UnlockScreen() {
   return (
     <div className={styles.screen}>
       <form className={styles.card} onSubmit={handleSubmit}>
-        <h1 className={styles.title}>Finoplan</h1>
+        <h1 className={styles.title}>{APP_NAME}</h1>
         <p className={styles.subtitle}>
           {mode === 'setup'
             ? 'Set a passphrase to secure your data on this device.'
