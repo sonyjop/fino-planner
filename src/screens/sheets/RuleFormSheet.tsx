@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import BottomSheet from '../../components/BottomSheet';
 import Button from '../../components/Button';
 import FormField from '../../components/FormField';
+import GroupedSelectField from '../../components/GroupedSelectField';
 import formFieldStyles from '../../components/FormField.module.css';
 import SelectField from '../../components/SelectField';
 import ToggleGroup from '../../components/ToggleGroup';
@@ -14,7 +15,7 @@ import { useRuleStore } from '../../stores/ruleStore';
 import { useUiStore } from '../../stores/uiStore';
 import { formatCurrency } from '../../utils/currency';
 import { todayDateString } from '../../utils/date';
-import { findCategoryGroup, getCategoryGroups } from '../../utils/metadata';
+import { describeInstrument, describeSubCategory, leafOptions, pickableLeaves } from '../../utils/metadata';
 import { describeSchedule, formatDate } from '../../utils/rule';
 import styles from './RuleFormSheet.module.css';
 
@@ -54,7 +55,6 @@ export default function RuleFormSheet() {
   const setStatus = useRuleStore((s) => s.setStatus);
   const remove = useRuleStore((s) => s.remove);
 
-  const categoryGroups = useMemo(() => getCategoryGroups(groups), [groups]);
   const isRuleSheet = activeSheet?.type === 'rule';
   const existing =
     isRuleSheet && activeSheet.mode === 'edit'
@@ -63,7 +63,8 @@ export default function RuleFormSheet() {
 
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
-  const [categoryId, setCategoryId] = useState('');
+  const [subCategoryId, setSubCategoryId] = useState('');
+  const [instrumentId, setInstrumentId] = useState('');
   const [type, setType] = useState<TransactionType>('expense');
   const [repeats, setRepeats] = useState<RuleCadence>('monthly');
   const [dayOfMonth, setDayOfMonth] = useState('1');
@@ -100,7 +101,8 @@ export default function RuleFormSheet() {
     if (existing) {
       setName(existing.name);
       setAmount(String(existing.amount));
-      setCategoryId(existing.categoryId);
+      setSubCategoryId(existing.subCategoryId);
+      setInstrumentId(existing.instrumentId ?? '');
       setType(existing.type);
       setRepeats(existing.repeats);
       setDayOfMonth(String(existing.dayOfMonth ?? 1));
@@ -112,7 +114,8 @@ export default function RuleFormSheet() {
     } else {
       setName('');
       setAmount('');
-      setCategoryId(categoryGroups[0]?.id ?? '');
+      setSubCategoryId(pickableLeaves(groups, 'category')[0]?.items[0]?.id ?? '');
+      setInstrumentId('');
       setType('expense');
       setRepeats('monthly');
       setDayOfMonth('1');
@@ -134,7 +137,8 @@ export default function RuleFormSheet() {
       name,
       amount: Number(amount),
       type,
-      categoryId,
+      subCategoryId,
+      instrumentId: instrumentId || undefined,
       repeats,
       dayOfMonth: Number(dayOfMonth),
       monthOfYear: repeats === 'monthly' ? undefined : Number(monthOfYear),
@@ -174,7 +178,6 @@ export default function RuleFormSheet() {
   }
 
   if (viewingVersion) {
-    const versionCategory = findCategoryGroup(groups, viewingVersion.categoryId);
     return (
       <BottomSheet title={`Version ${viewingVersion.version} — read only`} onClose={closeSheet}>
         <button type="button" className={styles.backLink} onClick={() => setViewingVersion(null)}>
@@ -196,8 +199,12 @@ export default function RuleFormSheet() {
             <span>{viewingVersion.type === 'income' ? 'Income' : 'Expense'}</span>
           </div>
           <div className={styles.readOnlyRow}>
-            <span>Category</span>
-            <span>{versionCategory?.name ?? 'Uncategorized'}</span>
+            <span>Sub-category</span>
+            <span>{describeSubCategory(groups, viewingVersion.subCategoryId)}</span>
+          </div>
+          <div className={styles.readOnlyRow}>
+            <span>Paid with</span>
+            <span>{describeInstrument(groups, viewingVersion.instrumentId) ?? '—'}</span>
           </div>
           <div className={styles.readOnlyRow}>
             <span>Amount</span>
@@ -271,17 +278,25 @@ export default function RuleFormSheet() {
           />
         </FormField>
 
-        <FormField label="Category">
-          <SelectField value={categoryId} onChange={(e) => setCategoryId(e.target.value)} required>
-            <option value="" disabled>
-              Select category
-            </option>
-            {categoryGroups.map((group) => (
-              <option key={group.id} value={group.id}>
-                {group.name}
-              </option>
-            ))}
-          </SelectField>
+        <FormField label="Sub-category">
+          <GroupedSelectField
+            value={subCategoryId}
+            onChange={setSubCategoryId}
+            groups={leafOptions(groups, 'category', existing?.subCategoryId)}
+            placeholder="Select sub-category"
+            required
+            aria-label="Sub-category"
+          />
+        </FormField>
+
+        <FormField label="Paid with (optional)">
+          <GroupedSelectField
+            value={instrumentId}
+            onChange={setInstrumentId}
+            groups={leafOptions(groups, 'paymentMode', existing?.instrumentId)}
+            placeholder="None"
+            aria-label="Paid with"
+          />
         </FormField>
 
         <FormField label="Type">
@@ -393,7 +408,7 @@ export default function RuleFormSheet() {
           </FormField>
         )}
 
-        <Button type="submit" disabled={submitting || !categoryId}>
+        <Button type="submit" disabled={submitting || !subCategoryId}>
           {existing ? 'Save rule' : 'Add rule'}
         </Button>
 

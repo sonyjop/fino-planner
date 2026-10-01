@@ -22,6 +22,7 @@ export function setUpTestDatabase(): void {
       db.syncOutbox.clear(),
       db.monthCacheMeta.clear(),
       db.authConfig.clear(),
+      db.fySummaries.clear(),
     ]);
   });
 }

@@ -7,7 +7,7 @@ setUpTestDatabase();
 const baseRule: CreateRuleInput = {
   name: 'Netflix',
   type: 'expense',
-  categoryId: 'cat-lifestyle',
+  subCategoryId: 'cat-lifestyle',
   amount: 649,
   repeats: 'monthly',
   dayOfMonth: 5,
@@ -136,6 +136,24 @@ describe('RuleService', () => {
       const list = await RuleService.list();
       const found = list.find((r) => r.ruleGroupId === rule.ruleGroupId)!;
       expect(found.status).toBe('active');
+    });
+  });
+
+  describe('sub-category and instrument (master-data.feature)', () => {
+    it('changing the sub-category starts a new rule; the old lineage is cancelled', async () => {
+      const v1 = await RuleService.create(baseRule);
+      const next = await RuleService.revise(v1.ruleGroupId, { subCategoryId: 'sub-other', effectiveFrom: '2026-10-01' });
+      expect(next.ruleGroupId).not.toBe(v1.ruleGroupId);
+      expect(next.version).toBe(1);
+      expect((await RuleService.getVersion(v1.id))?.status).toBe('cancelled');
+    });
+
+    it('changing only the instrument is a new version of the same rule', async () => {
+      const v1 = await RuleService.create({ ...baseRule, instrumentId: 'card-a' });
+      const v2 = await RuleService.revise(v1.ruleGroupId, { instrumentId: 'card-b', effectiveFrom: '2026-10-01' });
+      expect(v2.ruleGroupId).toBe(v1.ruleGroupId);
+      expect(v2.version).toBe(2);
+      expect(v2.instrumentId).toBe('card-b');
     });
   });
 });

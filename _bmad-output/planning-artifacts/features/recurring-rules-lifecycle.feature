@@ -1,11 +1,11 @@
 Feature: Recurring rule lifecycle
-  A recurring rule's content (name, category, type, amount, schedule, end date)
-  is immutable — every content edit produces a new version. Status
+  A recurring rule's content (name, sub-category, type, amount, schedule, end date,
+  payment instrument) is immutable — every content edit produces a new version. Status
   (active/paused/cancelled/deprecated/expired) is the one exception: it
   mutates in place and never creates a version.
 
   Scenario: Creating a rule
-    When I fill in name, amount, category, type, cadence, schedule, and start date, then save
+    When I fill in name, amount, sub-category, type, cadence, schedule, and start date, then save
     Then a new rule is created as version 1 with status "Active"
 
   Scenario: Choosing a monthly cadence
@@ -35,14 +35,14 @@ Feature: Recurring rule lifecycle
 
   Scenario: Editing amount or schedule creates a new version, same rule
     Given a rule exists at version 1
-    When I change its amount (or day of month, or cadence) and save
+    When I change its amount (or day of month, or cadence, or payment instrument) and save
     Then a new version 2 is created with the same rule identity
     And version 1's status becomes "Deprecated"
     And version 2 inherits version 1's pre-edit status as its own starting status
 
-  Scenario: Editing name, category, or type creates a brand-new rule
+  Scenario: Editing name, sub-category, or type creates a brand-new rule
     Given a rule exists at version 1
-    When I change its name (or category, or type) and save
+    When I change its name (or sub-category, or type) and save
     Then a brand-new rule is created at version 1
     And the original rule's current version becomes "Cancelled"
     And the new rule inherits the original's pre-edit status

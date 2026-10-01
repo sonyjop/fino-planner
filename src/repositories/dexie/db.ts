@@ -1,7 +1,11 @@
 import Dexie, { type Table } from 'dexie';
 import { APP_SLUG } from '../../config/app';
 import type { MetadataGroup } from '../../models/MetadataGroup';
-import type { StoredRuleRecord, StoredTransactionRecord } from './StoredRecords';
+import type {
+  StoredFiscalYearSummaryRecord,
+  StoredRuleRecord,
+  StoredTransactionRecord,
+} from './StoredRecords';
 
 export interface SyncOutboxEntry {
   localSeq?: number;
@@ -30,6 +34,7 @@ class FinoPlannerDB extends Dexie {
   syncOutbox!: Table<SyncOutboxEntry, number>;
   monthCacheMeta!: Table<MonthCacheMetaRecord, string>;
   authConfig!: Table<AuthConfigRecord, string>;
+  fySummaries!: Table<StoredFiscalYearSummaryRecord, number>;
 
   constructor() {
     super(APP_SLUG);
@@ -40,6 +45,16 @@ class FinoPlannerDB extends Dexie {
       syncOutbox: '++localSeq, entityType, entityId, op, createdAt',
       monthCacheMeta: 'monthKey, lastAccessedAt',
       authConfig: 'id',
+    });
+    // Additive only — derived, event-maintained FY summary documents (architecture.md §7).
+    this.version(2).stores({
+      fySummaries: 'fyStartYear, updatedAt',
+    });
+    // Leaf-only Master Data (architecture.md §2.2): records index the sub-category, not the
+    // category. Index change only — the app starts from a clean database, no data migration.
+    this.version(3).stores({
+      transactions: 'id, monthKey, year, ruleId, ruleGroupId, subCategoryId, statusKind, updatedAt',
+      rules: 'id, ruleGroupId, status, subCategoryId, effectiveFrom, updatedAt',
     });
   }
 }

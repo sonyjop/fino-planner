@@ -1,0 +1,19 @@
+.selector {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+
+.label {
+  font-weight: 600;
+}
+
+.navButton {
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: var(--space-2);
+  display: flex;
+}

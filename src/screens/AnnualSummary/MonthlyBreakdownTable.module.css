@@ -1,0 +1,72 @@
+/* Scrolls sideways on narrow phones; the month column stays pinned (sticky) while it does. */
+.scroller {
+  overflow-x: auto;
+  margin-bottom: var(--space-5);
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.table th,
+.table td {
+  padding: var(--space-2) var(--space-2);
+  text-align: right;
+}
+
+.table thead th {
+  font-weight: 600;
+  text-align: center;
+}
+
+.subHeader th {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.monthCol {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--color-surface);
+  text-align: left !important;
+  font-weight: 500;
+}
+
+.row {
+  cursor: pointer;
+}
+
+.row:hover td,
+.row:hover .monthCol {
+  background: #f6f7fb;
+}
+
+.current td,
+.current .monthCol {
+  background: #e3e8ff;
+  font-weight: 600;
+}
+
+.totalRow th,
+.totalRow td {
+  border-top: 1px solid #e4e7ef;
+  font-weight: 700;
+}
+
+.income {
+  color: var(--color-income);
+}
+
+.expense {
+  color: var(--color-expense);
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fiscalYearLabel, fiscalYearStart, ordinal } from './date';
+import { fiscalYearLabel, fiscalYearMonths, fiscalYearOfDate, fiscalYearStart, ordinal } from './date';
 
 describe('ordinal', () => {
   it('handles the 11th/12th/13th special case', () => {
@@ -27,7 +27,22 @@ describe('fiscalYearStart / fiscalYearLabel', () => {
     expect(fiscalYearStart(new Date(2026, 8, 24))).toBe(2026); // Sep 2026 -> FY2026-27
   });
 
-  it('labels a fiscal year as "FY start-end"', () => {
-    expect(fiscalYearLabel(2026)).toBe('FY 2026-27');
+  it('labels a fiscal year as "FY start–end" with an en dash', () => {
+    expect(fiscalYearLabel(2026)).toBe('FY 2026–27');
+  });
+
+  it('buckets 31 Mar into the previous FY and 1 Apr into the next', () => {
+    expect(fiscalYearOfDate('2027-03-31')).toBe(2026);
+    expect(fiscalYearOfDate('2027-04-01')).toBe(2027);
+    expect(fiscalYearOfDate('2027-01')).toBe(2026);
+  });
+
+  it('lists the 12 months of a FY from April to March', () => {
+    const months = fiscalYearMonths(2026).map((m) => m.monthKey);
+    expect(months).toHaveLength(12);
+    expect(months[0]).toBe('2026-04');
+    expect(months[8]).toBe('2026-12');
+    expect(months[9]).toBe('2027-01');
+    expect(months[11]).toBe('2027-03');
   });
 });

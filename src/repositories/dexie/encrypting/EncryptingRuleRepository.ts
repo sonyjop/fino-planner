@@ -18,6 +18,7 @@ type EncryptedRuleFields = Pick<
   | 'endDate'
   | 'effectiveTo'
   | 'supersedesId'
+  | 'instrumentId'
   | 'createdAt'
 >;
 
@@ -78,6 +79,7 @@ export class EncryptingRuleRepository implements RuleRepository {
       endDate: rule.endDate,
       effectiveTo: rule.effectiveTo,
       supersedesId: rule.supersedesId,
+      instrumentId: rule.instrumentId,
       createdAt: rule.createdAt,
     };
     const { cipherPayload, iv } = await this.crypto.encrypt(encryptedFields);
@@ -85,7 +87,7 @@ export class EncryptingRuleRepository implements RuleRepository {
       id: rule.id,
       ruleGroupId: rule.ruleGroupId,
       version: rule.version,
-      categoryId: rule.categoryId,
+      subCategoryId: rule.subCategoryId,
       status: rule.status,
       effectiveFrom: rule.effectiveFrom,
       updatedAt: rule.updatedAt,
@@ -100,7 +102,7 @@ export class EncryptingRuleRepository implements RuleRepository {
       id: record.id,
       ruleGroupId: record.ruleGroupId,
       version: record.version,
-      categoryId: record.categoryId,
+      subCategoryId: record.subCategoryId,
       status: record.status,
       effectiveFrom: record.effectiveFrom,
       updatedAt: record.updatedAt,

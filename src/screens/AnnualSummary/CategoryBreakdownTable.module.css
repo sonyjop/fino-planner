@@ -1,0 +1,65 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.table th,
+.table td {
+  padding: var(--space-2) var(--space-3);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.table th:first-child {
+  text-align: left;
+  white-space: normal;
+}
+
+.table thead th {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.table thead th:first-child {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.category {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 500;
+}
+
+.totalRow th,
+.totalRow td {
+  border-top: 1px solid #e4e7ef;
+  font-weight: 700;
+}
+
+.income {
+  color: var(--color-income) !important;
+}
+
+.expense {
+  color: var(--color-expense) !important;
+}
+
+.empty {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  padding: var(--space-3) 0;
+}

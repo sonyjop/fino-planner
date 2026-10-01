@@ -21,7 +21,7 @@ export type RuleStatus = 'active' | 'paused' | 'cancelled' | 'deprecated' | 'exp
 /**
  * Rules are immutable and versioned. Every content edit produces a new row:
  * - amount / schedule changing -> a new version, same ruleGroupId, old row -> 'deprecated'
- * - name / categoryId / type changing -> a brand-new ruleGroupId (chain break), old row -> 'cancelled'
+ * - name / subCategoryId / type changing -> a brand-new ruleGroupId (chain break), old row -> 'cancelled'
  *
  * Status (active/paused/cancelled) is the one exception — it mutates in place, never versions
  * (see RuleRepository.updateStatus). RuleRepository's `save` is otherwise insert-only.
@@ -37,7 +37,8 @@ export interface RecurringRule {
   name: string; // chain-breaking if changed
   description?: string; // cosmetic — non-breaking
   type: TransactionType; // chain-breaking if changed
-  categoryId: string; // chain-breaking if changed ("tag")
+  subCategoryId: string; // chain-breaking if changed ("tag"); category derived
+  instrumentId?: string; // versions, doesn't break chain; pre-fills completed occurrences
 
   amount: number; // versions, doesn't break chain
   repeats: RuleCadence;

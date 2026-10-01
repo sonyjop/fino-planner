@@ -3,12 +3,15 @@ import type { RecurringRule, RuleCadence, RuleStatus } from '../models/Recurring
 import { ruleRepository } from '../repositories';
 import { createId } from '../utils/id';
 import { todayDateString } from '../utils/date';
+import { domainEvents } from './domainEvents';
+import { MetadataService } from './MetadataService';
 
 export interface CreateRuleInput {
   name: string;
   description?: string;
   type: TransactionType;
-  categoryId: string;
+  subCategoryId: string;
+  instrumentId?: string;
   amount: number;
   repeats: RuleCadence;
   dayOfMonth?: number;
@@ -26,7 +29,8 @@ export interface ReviseRuleInput {
   name?: string;
   description?: string;
   type?: TransactionType;
-  categoryId?: string;
+  subCategoryId?: string;
+  instrumentId?: string;
   amount?: number;
   repeats?: RuleCadence;
   dayOfMonth?: number;
@@ -37,7 +41,7 @@ export interface ReviseRuleInput {
 }
 
 /** architecture.md §2.4 — changing any of these starts a new lineage instead of a new version. */
-const CHAIN_BREAKING_FIELDS = ['name', 'categoryId', 'type'] as const;
+const CHAIN_BREAKING_FIELDS = ['name', 'subCategoryId', 'type'] as const;
 
 /** Only these can still transition to 'expired' — cancelled/deprecated/expired are already terminal for this purpose. */
 const EXPIRABLE_STATUSES: RuleStatus[] = ['active', 'paused'];
@@ -95,7 +99,8 @@ export const RuleService = {
       name: input.name,
       description: input.description,
       type: input.type,
-      categoryId: input.categoryId,
+      subCategoryId: input.subCategoryId,
+      instrumentId: input.instrumentId,
       amount: input.amount,
       repeats: input.repeats,
       dayOfMonth: input.dayOfMonth,
@@ -107,11 +112,13 @@ export const RuleService = {
       updatedAt: now,
     };
     await ruleRepository.save(rule);
+    await MetadataService.markUsed([rule.subCategoryId, rule.instrumentId]);
+    await domainEvents.emit({ type: 'rulesChanged' });
     return rule;
   },
 
   /**
-   * Content edit (§2.4): identity fields (name/categoryId/type) changing starts a new
+   * Content edit (§2.4): identity fields (name/subCategoryId/type) changing starts a new
    * lineage; anything else (amount, schedule) creates the next version in the same one.
    * The row being superseded is automatically force-set to a status regardless of what it
    * was — 'deprecated' for an in-lineage version bump, 'cancelled' for a chain-break
@@ -151,6 +158,8 @@ export const RuleService = {
       await ruleRepository.save({ ...current, effectiveTo: effectiveFrom, status: 'deprecated', updatedAt: now });
     }
     await ruleRepository.save(revised);
+    await MetadataService.markUsed([revised.subCategoryId, revised.instrumentId]);
+    await domainEvents.emit({ type: 'rulesChanged' });
     return revised;
   },
 
@@ -160,6 +169,7 @@ export const RuleService = {
     const current = history[history.length - 1];
     if (!current) throw new Error(`No rule found for group ${ruleGroupId}`);
     await ruleRepository.updateStatus(current.id, status);
+    await domainEvents.emit({ type: 'rulesChanged' });
     return { ...current, status };
   },
 
@@ -172,5 +182,6 @@ export const RuleService = {
   async deleteLineage(ruleGroupId: string): Promise<void> {
     const history = await ruleRepository.getByRuleGroupId(ruleGroupId);
     await Promise.all(history.map((version) => ruleRepository.delete(version.id)));
+    await domainEvents.emit({ type: 'rulesChanged' });
   },
 };

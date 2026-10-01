@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import BottomSheet from '../../components/BottomSheet';
 import Button from '../../components/Button';
 import FormField from '../../components/FormField';
+import GroupedSelectField from '../../components/GroupedSelectField';
 import formFieldStyles from '../../components/FormField.module.css';
-import SelectField from '../../components/SelectField';
 import ToggleGroup from '../../components/ToggleGroup';
 import type { TransactionType } from '../../models/common';
 import type { RecurringRule } from '../../models/RecurringRule';
@@ -13,7 +13,7 @@ import { useMetadataStore } from '../../stores/metadataStore';
 import { useTransactionStore } from '../../stores/transactionStore';
 import { useUiStore } from '../../stores/uiStore';
 import { todayDateString } from '../../utils/date';
-import { findGroupByKey, getCategoryGroups, resolveItemIdByLabel } from '../../utils/metadata';
+import { leafOptions, pickableLeaves } from '../../utils/metadata';
 import styles from './TransactionFormSheet.module.css';
 
 export default function TransactionFormSheet() {
@@ -26,8 +26,6 @@ export default function TransactionFormSheet() {
   const update = useTransactionStore((s) => s.update);
   const remove = useTransactionStore((s) => s.remove);
 
-  const categoryGroups = useMemo(() => getCategoryGroups(groups), [groups]);
-  const statusGroup = useMemo(() => findGroupByKey(groups, 'status'), [groups]);
   const isTransactionSheet = activeSheet?.type === 'transaction';
   const existing =
     isTransactionSheet && activeSheet.mode === 'edit'
@@ -35,13 +33,14 @@ export default function TransactionFormSheet() {
       : undefined;
 
   const [title, setTitle] = useState('');
-  const [amount, setAmount] = useState('');
-  const [categoryId, setCategoryId] = useState('');
+  const [plannedAmount, setPlannedAmount] = useState('');
+  const [actualAmount, setActualAmount] = useState('');
+  const [subCategoryId, setSubCategoryId] = useState('');
+  const [instrumentId, setInstrumentId] = useState('');
   const [type, setType] = useState<TransactionType>('expense');
   const [date, setDate] = useState(todayDateString());
   const [notes, setNotes] = useState('');
   const [statusKind, setStatusKind] = useState<TransactionStatusKind>('planned');
-  const [statusLabelId, setStatusLabelId] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [originRule, setOriginRule] = useState<RecurringRule | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
@@ -62,22 +61,25 @@ export default function TransactionFormSheet() {
     if (!isTransactionSheet) return;
     if (existing) {
       setTitle(existing.title);
-      setAmount(String(existing.amount));
-      setCategoryId(existing.categoryId);
+      setPlannedAmount(String(existing.plannedAmount));
+      setActualAmount(existing.actualAmount !== undefined ? String(existing.actualAmount) : '');
+      setSubCategoryId(existing.subCategoryId);
+      // A virtual occurrence carries its rule's instrument — pre-filled, changeable for this one only.
+      setInstrumentId(existing.instrumentId ?? '');
       setType(existing.type);
       setDate(existing.date);
       setNotes(existing.notes ?? '');
       setStatusKind(existing.statusKind);
-      setStatusLabelId(existing.statusLabelId ?? '');
     } else {
       setTitle('');
-      setAmount('');
-      setCategoryId(categoryGroups[0]?.id ?? '');
+      setPlannedAmount('');
+      setActualAmount('');
+      setSubCategoryId(pickableLeaves(groups, 'category')[0]?.items[0]?.id ?? '');
+      setInstrumentId('');
       setType('expense');
       setDate(todayDateString());
       setNotes('');
       setStatusKind('planned');
-      setStatusLabelId('');
     }
     // Re-seed the form whenever a different sheet target opens — not on every keystroke.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -85,9 +87,21 @@ export default function TransactionFormSheet() {
 
   if (!isTransactionSheet) return null;
 
+  // transactions.feature: a brand-new entry saved straight as Completed was never planned
+  // (planned = 0), so it only asks for what was paid. Anything that was planned first shows
+  // both amounts once completed, with actual pre-filled from planned.
+  const isUnplannedCompletion = !existing && statusKind === 'actual';
+  const showsBothAmounts = statusKind === 'actual' && !isUnplannedCompletion;
+
+  function handleStatusChange(next: TransactionStatusKind) {
+    if (next === 'actual' && actualAmount === '') setActualAmount(plannedAmount);
+    // A new entry typed while Completed keeps its value when switched back to Planned.
+    if (next === 'planned' && !existing && plannedAmount === '') setPlannedAmount(actualAmount);
+    setStatusKind(next);
+  }
+
   // basic-usecases.txt Cashflow #7 — statusKind is a free toggle, not a one-way "mark as
-  // paid"; statusLabelId is a separate, purely cosmetic tag (defaults to match the toggle
-  // unless the user picked something else, e.g. 'Partial' while still planned).
+  // paid". Status is a fixed Planned/Completed pair; there is no separate label (master-data.feature).
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
@@ -100,25 +114,30 @@ export default function TransactionFormSheet() {
     setSubmitting(true);
     const input = {
       title,
-      amount: Number(amount),
+      plannedAmount: Number(plannedAmount || 0),
+      actualAmount: statusKind === 'actual' ? Number(actualAmount || 0) : undefined,
       type,
-      categoryId,
+      subCategoryId,
+      instrumentId: instrumentId || undefined,
       date,
       notes: notes || undefined,
       statusKind,
-      statusLabelId:
-        statusLabelId || resolveItemIdByLabel(groups, 'status', statusKind === 'actual' ? 'Paid' : 'Planned'),
     };
-    if (isVirtual) {
-      // No real row exists yet — completing it creates one for the first time.
-      await create({ ...input, ruleId: existing!.ruleId, ruleGroupId: existing!.ruleGroupId });
-    } else if (existing) {
-      await update(existing.id, input);
-    } else {
-      await create(input);
+    try {
+      if (isVirtual) {
+        // No real row exists yet — completing it creates one for the first time.
+        await create({ ...input, ruleId: existing!.ruleId, ruleGroupId: existing!.ruleGroupId });
+      } else if (existing) {
+        await update(existing.id, input);
+      } else {
+        await create(input);
+      }
+      closeSheet();
+    } catch {
+      setError('Couldn’t save — please try again.');
+    } finally {
+      setSubmitting(false);
     }
-    setSubmitting(false);
-    closeSheet();
   }
 
   async function handleDelete() {
@@ -151,31 +170,70 @@ export default function TransactionFormSheet() {
           />
         </FormField>
 
-        <FormField label="Amount">
-          <input
-            className={formFieldStyles.input}
-            type="number"
-            inputMode="decimal"
-            min="0"
-            step="1"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="Enter amount"
+        {showsBothAmounts ? (
+          <>
+            <FormField label="Planned amount">
+              <input
+                className={formFieldStyles.input}
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="1"
+                value={plannedAmount}
+                onChange={(e) => setPlannedAmount(e.target.value)}
+                placeholder="Enter planned amount"
+                required
+              />
+            </FormField>
+            <FormField label="Actual amount">
+              <input
+                className={formFieldStyles.input}
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="1"
+                value={actualAmount}
+                onChange={(e) => setActualAmount(e.target.value)}
+                placeholder="Enter actual amount"
+                required
+              />
+            </FormField>
+          </>
+        ) : (
+          <FormField label="Amount">
+            <input
+              className={formFieldStyles.input}
+              type="number"
+              inputMode="decimal"
+              min="0"
+              step="1"
+              value={isUnplannedCompletion ? actualAmount : plannedAmount}
+              onChange={(e) => (isUnplannedCompletion ? setActualAmount : setPlannedAmount)(e.target.value)}
+              placeholder="Enter amount"
+              required
+            />
+          </FormField>
+        )}
+
+        <FormField label="Sub-category">
+          <GroupedSelectField
+            value={subCategoryId}
+            onChange={setSubCategoryId}
+            groups={leafOptions(groups, 'category', existing?.subCategoryId)}
+            placeholder="Select sub-category"
             required
+            aria-label="Sub-category"
           />
         </FormField>
 
-        <FormField label="Category">
-          <SelectField value={categoryId} onChange={(e) => setCategoryId(e.target.value)} required>
-            <option value="" disabled>
-              Select category
-            </option>
-            {categoryGroups.map((group) => (
-              <option key={group.id} value={group.id}>
-                {group.name}
-              </option>
-            ))}
-          </SelectField>
+        <FormField label="Paid with (optional)">
+          <GroupedSelectField
+            value={instrumentId}
+            onChange={setInstrumentId}
+            groups={leafOptions(groups, 'paymentMode', existing?.instrumentId)}
+            placeholder="None"
+            aria-label="Paid with"
+          />
         </FormField>
 
         <FormField label="Type">
@@ -196,22 +254,9 @@ export default function TransactionFormSheet() {
               { value: 'actual', label: 'Completed' },
             ]}
             value={statusKind}
-            onChange={setStatusKind}
+            onChange={handleStatusChange}
           />
         </FormField>
-
-        {statusGroup && statusGroup.items.length > 0 && (
-          <FormField label="Status label (optional)">
-            <SelectField value={statusLabelId} onChange={(e) => setStatusLabelId(e.target.value)}>
-              <option value="">Auto ({statusKind === 'actual' ? 'Paid' : 'Planned'})</option>
-              {statusGroup.items.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.label}
-                </option>
-              ))}
-            </SelectField>
-          </FormField>
-        )}
 
         <FormField label="Due Date">
           <input
@@ -234,7 +279,7 @@ export default function TransactionFormSheet() {
 
         {error && <p className={styles.error}>{error}</p>}
 
-        <Button type="submit" disabled={submitting || !categoryId}>
+        <Button type="submit" disabled={submitting || !subCategoryId}>
           {isVirtual ? 'Mark completed' : existing ? 'Save changes' : 'Add entry'}
         </Button>
 

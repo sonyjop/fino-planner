@@ -47,3 +47,9 @@
 .expense {
   color: var(--color-expense);
 }
+
+.instrument {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}

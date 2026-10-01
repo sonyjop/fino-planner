@@ -8,13 +8,12 @@ import type { StoredTransactionRecord } from '../StoredRecords';
 type EncryptedTransactionFields = Pick<
   Transaction,
   | 'title'
-  | 'amount'
+  | 'plannedAmount'
+  | 'actualAmount'
   | 'type'
   | 'date'
   | 'notes'
-  | 'accountId'
-  | 'paymentModeId'
-  | 'statusLabelId'
+  | 'instrumentId'
   | 'createdAt'
 >;
 
@@ -31,6 +30,11 @@ export class EncryptingTransactionRepository implements TransactionRepository {
 
   async getByMonth(year: number, month: number): Promise<Transaction[]> {
     const records = await this.raw.getByMonth(year, month);
+    return Promise.all(records.map((r) => this.toDomain(r)));
+  }
+
+  async getByMonthRange(fromMonthKey: string, toMonthKey: string): Promise<Transaction[]> {
+    const records = await this.raw.getByMonthRange(fromMonthKey, toMonthKey);
     return Promise.all(records.map((r) => this.toDomain(r)));
   }
 
@@ -60,13 +64,12 @@ export class EncryptingTransactionRepository implements TransactionRepository {
   private async toStored(tx: Transaction): Promise<StoredTransactionRecord> {
     const encryptedFields: EncryptedTransactionFields = {
       title: tx.title,
-      amount: tx.amount,
+      plannedAmount: tx.plannedAmount,
+      actualAmount: tx.actualAmount,
       type: tx.type,
       date: tx.date,
       notes: tx.notes,
-      accountId: tx.accountId,
-      paymentModeId: tx.paymentModeId,
-      statusLabelId: tx.statusLabelId,
+      instrumentId: tx.instrumentId,
       createdAt: tx.createdAt,
     };
     const { cipherPayload, iv } = await this.crypto.encrypt(encryptedFields);
@@ -74,7 +77,7 @@ export class EncryptingTransactionRepository implements TransactionRepository {
       id: tx.id,
       monthKey: tx.monthKey,
       year: tx.year,
-      categoryId: tx.categoryId,
+      subCategoryId: tx.subCategoryId,
       statusKind: tx.statusKind,
       ruleId: tx.ruleId,
       ruleGroupId: tx.ruleGroupId,
@@ -90,7 +93,7 @@ export class EncryptingTransactionRepository implements TransactionRepository {
       id: record.id,
       monthKey: record.monthKey,
       year: record.year,
-      categoryId: record.categoryId,
+      subCategoryId: record.subCategoryId,
       statusKind: record.statusKind,
       ruleId: record.ruleId,
       ruleGroupId: record.ruleGroupId,

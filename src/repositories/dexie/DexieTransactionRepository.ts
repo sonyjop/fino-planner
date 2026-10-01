@@ -11,6 +11,10 @@ export class DexieTransactionRepository {
     return db.transactions.where('monthKey').equals(monthKey).toArray();
   }
 
+  async getByMonthRange(fromMonthKey: string, toMonthKey: string): Promise<StoredTransactionRecord[]> {
+    return db.transactions.where('monthKey').between(fromMonthKey, toMonthKey, true, true).toArray();
+  }
+
   async getById(id: string): Promise<StoredTransactionRecord | undefined> {
     return db.transactions.get(id);
   }

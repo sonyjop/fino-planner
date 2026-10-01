@@ -94,9 +94,10 @@ export function computeVirtualPlannedTransactions(
     results.push({
       id: `virtual:${version.id}:${monthKey}`,
       title: version.name,
-      amount: version.amount,
+      plannedAmount: version.amount,
       type: version.type,
-      categoryId: version.categoryId,
+      subCategoryId: version.subCategoryId,
+      instrumentId: version.instrumentId,
       date: occursOn,
       statusKind: 'planned',
       ruleId: version.id,
@@ -109,6 +110,18 @@ export function computeVirtualPlannedTransactions(
   }
 
   return results;
+}
+
+/**
+ * Pure — merges what's genuinely stored for a month (adhoc planned entries, and anything
+ * completed) with that month's computed virtual occurrences, dropping a virtual one wherever
+ * a real row already exists for its rule lineage (i.e. it's already been completed). Shared
+ * by the Cashflow month view and the FY summary so a completed occurrence counts exactly once.
+ */
+export function mergeStoredWithVirtual(stored: Transaction[], virtual: Transaction[]): Transaction[] {
+  const storedRuleGroupIds = new Set(stored.filter((tx) => tx.ruleGroupId).map((tx) => tx.ruleGroupId));
+  const unclaimed = virtual.filter((tx) => !storedRuleGroupIds.has(tx.ruleGroupId));
+  return [...stored, ...unclaimed];
 }
 
 export const RuleEngineService = {

@@ -24,7 +24,23 @@ export function fiscalYearStart(date: Date): number {
 }
 
 export function fiscalYearLabel(fyStartYear: number): string {
-  return `FY ${fyStartYear}-${String((fyStartYear + 1) % 100).padStart(2, '0')}`;
+  return `FY ${fyStartYear}–${String((fyStartYear + 1) % 100).padStart(2, '0')}`;
+}
+
+/** The FY start year an ISO date or 'YYYY-MM' key belongs to — April starts a new FY. */
+export function fiscalYearOfDate(dateOrMonthKey: string): number {
+  const year = Number(dateOrMonthKey.slice(0, 4));
+  const month = Number(dateOrMonthKey.slice(5, 7));
+  return month >= 4 ? year : year - 1;
+}
+
+/** The 12 { year, month } pairs of a financial year, April first. */
+export function fiscalYearMonths(fyStartYear: number): { year: number; month: number; monthKey: MonthKey }[] {
+  return Array.from({ length: 12 }, (_, i) => {
+    const month = ((3 + i) % 12) + 1;
+    const year = i < 9 ? fyStartYear : fyStartYear + 1;
+    return { year, month, monthKey: `${year}-${pad2(month)}` };
+  });
 }
 
 /** 1 -> '1st', 2 -> '2nd', 12 -> '12th', 21 -> '21st'... */

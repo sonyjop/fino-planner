@@ -1,7 +1,7 @@
 ---
 title: Personal Finance Planner — Architecture (v1)
 status: validated
-updated: 2026-09-24
+updated: 2026-10-01
 ---
 
 # Personal Finance Planner — Design Document (v1)
@@ -24,7 +24,7 @@ Sections marked **[ASSUMPTION]** are places I inferred beyond what you said — 
 | Cloud persistence | Firebase Firestore | Interface + outbox shape designed now; `FirestoreRepository` implementations come later |
 | Sync boundary | Local Dexie writes synchronous; remote pushed via a persisted **outbox queue** | See §5 — no new library, just a Dexie table + a small `SyncService` |
 | Routing | None — tab state in the UI store | 4 tabs + sheets; avoids GitHub Pages subpath/deep-link complexity |
-| Charting (Annual Summary) | Minimal custom SVG bar chart **[ASSUMPTION — easy to swap]** | Keeps bundle small; swap for a library (e.g. recharts) later if you want richer interaction |
+| Annual Summary visuals | Plain HTML tables (monthwise + category), no charting library | Readable on a phone with compact amounts; add a chart library later only if a visual trend view is wanted |
 | Date handling | date-fns **[ASSUMPTION — easy to swap]** | Tree-shakeable |
 | ID generation | nanoid **[ASSUMPTION — easy to swap]** | Small, collision-safe, offline-safe |
 | Hosting/CI | GitHub Pages via GitHub Actions | Free, matches "low-cost git-like platform" |
@@ -43,32 +43,52 @@ Every transaction carries two things that decide planned vs. actual:
 
 `statusKind` is **freely bidirectional**, via one unified control in the transaction sheet — not a one-way "mark as paid." It can be set directly at creation time too (logging something already paid skips the planned step entirely), and an already-`actual` transaction can be moved back to `planned` (undo). basic-usecases.txt Cashflow #7.
 
-`statusLabelId` is a separate, purely cosmetic display label (Planned / Partial / Paid / anything you add) sourced from Master Data. It drives the pill text/color only, never the math or bucketing — "Partial" in particular carries **no** amount-tracking behavior; it's just a tag a transaction can wear while still `planned`.
+Status is **not Master Data**: `'planned' | 'actual'` (shown as Planned / Completed) is the complete, fixed list, defined in code. There is no separate cosmetic status label and no user-defined status. The row pill is derived from `statusKind` alone. (`features/master-data.feature`)
 
-### 2.2 Master Data — enumeration groups
+### 2.2 Master Data — two two-level hierarchies
 
-Confirmed: the same `MetadataGroup` primitive is used two ways — as a **category** (the group itself is the selectable value), and as a **pure enumeration** (the group is a named bucket like "Payment Modes"/"Accounts"/"Status" whose *items* are the selectable values).
+Behaviour is specified in `features/master-data.feature`. Master Data holds two hierarchies built from the same `MetadataGroup` → `MetadataItem` primitive:
 
-`key` is a **type discriminator**, not a unique id: every category-purpose group (Housing, Income, Essentials...) shares `key: 'category'` — there are many of them, distinguished by their own `id`/`name`. `'account'`, `'paymentMode'`, and `'status'` each have exactly **one** group with that key, since those are single well-known enumerations the app queries by key (e.g. "the payment-mode group"). `isSystem: true` marks a group whose *existence* the app depends on (`account`/`paymentMode`/`status` — the group itself can't be deleted, though its items can be freely edited); category groups are `isSystem: false` — fully user-manageable, add/remove at will.
+| Hierarchy | Group (parent) | Item (leaf) | Who manages it |
+|---|---|---|---|
+| Categories | `key: 'category'`: Housing, Essentials, Income… | sub-category: House Rent, Grocery… | User: add, rename, recolour, archive |
+| Payment | `key: 'paymentMode'`: exactly six fixed groups (Credit Card, Debit Card, UPI, Net Banking, Cash, Wallet) | instrument: "HDFC Regalia ••4321", "GPay (SBI Savings)" | Modes are system-defined and immutable. Instruments are user-managed, except the built-in "Cash" instrument |
+
+Rules that keep every unit consistent:
+
+- **Only the leaf is stored.** Transactions and rules record `subCategoryId`, and optionally `instrumentId`. The category and payment mode are always **derived** through the item → group index, never stored, so they can't disagree. Item ids are globally unique (nanoid), so a leaf id alone resolves its parent.
+- **A leaf never changes parent.** A sub-category can't move to another category, and an instrument can't move to another mode. Otherwise derived history would silently re-file.
+- **Type is independent of category.** `type` lives on the transaction or rule; any sub-category may be used for income or expense.
+- **Archive, never delete, once used.** Groups and items carry `archived`. Archived entries are hidden from pickers but always resolvable for display and aggregation. Archiving a category archives its sub-categories; restoring a sub-category restores its parent. Permanent deletion is allowed only while `firstUsedAt` is unset. That flag is stamped the first time any transaction or rule version references the entry, and never cleared, so "ever used" survives the deletion of the transaction that used it.
+- **No sensitive numbers.** Master Data is stored unencrypted (§8.1). An instrument holds a nickname plus optional `last4` (exactly 4 digits). A nickname containing a run of more than 4 digits is rejected.
+- **No other enumerations in v1.** The old `status` and `account` groups are gone. Custom user-defined groups are out of scope. Payment mode and instrument are descriptive only: no balances or transfers in v1.
+- **Seeding** happens on first run only. Starter categories come with their sub-categories; the six payment modes come with the system "Cash" instrument under Cash.
 
 ```ts
 interface MetadataGroup {
   id: string;
-  key: string;          // 'category' (shared by many) | 'account' | 'paymentMode' | 'status' (one each)
+  key: 'category' | 'paymentMode';
+  systemCode?: 'creditCard' | 'debitCard' | 'upi' | 'netBanking' | 'cash' | 'wallet'; // paymentMode groups only
   name: string;
   icon: string;
   color: string;
-  isSystem: boolean;     // true = app logic depends on this group existing (account/paymentMode/status)
+  isSystem: boolean;      // true for the six payment modes: cannot be added, renamed, reordered, archived or deleted
+  archived: boolean;      // categories only
+  firstUsedAt?: string;   // set on first reference by any transaction/rule (via its items); never cleared
   items: MetadataItem[];
+  order: number;
   createdAt: string;
   updatedAt: string;
 }
 
 interface MetadataItem {
-  id: string;
-  label: string;
+  id: string;             // globally unique — a leaf id alone identifies its parent group
+  label: string;          // sub-category name, or instrument nickname (unique among siblings, case-insensitive)
+  last4?: string;         // instruments only: exactly 4 digits, displayed as "label ••1234"
+  isSystem?: boolean;     // the built-in "Cash" instrument
   order: number;
-  archived: boolean;     // soft-delete so historical transactions don't dangle
+  archived: boolean;
+  firstUsedAt?: string;   // set on first reference; deletion allowed only while unset
 }
 ```
 
@@ -78,14 +98,13 @@ interface MetadataItem {
 interface Transaction {
   id: string;
   title: string;
-  amount: number;
+  plannedAmount: number;        // what was planned; 0 when created directly as completed (unplanned)
+  actualAmount?: number;        // what was actually paid/received; set only while statusKind is 'actual'
   type: 'income' | 'expense';
-  categoryId: string;          // → MetadataGroup.id
+  subCategoryId: string;       // → MetadataItem.id under a 'category' group; category is derived
   date: string;                 // ISO date; auto = entry date unless changed
   statusKind: 'planned' | 'actual';
-  statusLabelId?: string;       // → MetadataItem.id in the 'status' group (display only)
-  accountId?: string;           // → MetadataItem.id in the 'account' group
-  paymentModeId?: string;       // → MetadataItem.id in the 'paymentMode' group
+  instrumentId?: string;        // → MetadataItem.id under a 'paymentMode' group; payment mode is derived
   notes?: string;
   ruleId?: string;               // exact rule VERSION that spawned this
   ruleGroupId?: string;          // full rule LINEAGE — survives rule edits (see 2.4)
@@ -113,7 +132,7 @@ interface Transaction {
 Two outcomes for a *content* edit, depending on what changed:
 
 - **New version, same lineage** — amount or schedule (`dayOfMonth`/cadence) changed. Gets the next `version` number, same `ruleGroupId`, `effectiveFrom` = the date you pick (defaults to today). The superseded row's `effectiveTo` is set to that same date (exclusive), `supersedesId` links back, **and its `status` is force-set to `deprecated`** regardless of what it was.
-- **New lineage entirely** — **`name`, `categoryId`, or `type`** changed. Gets a brand-new `ruleGroupId`, `version: 1`, no `supersedesId`, no `effectiveTo` (a separate lineage, not a closed date range). The new lineage's initial `status` **inherits** the old lineage's pre-supersede status. The **old** lineage's current row is **force-set to `cancelled`** — terminal, unlike `deprecated`. `description` changing alone is cosmetic — non-breaking, versions in place like amount/schedule.
+- **New lineage entirely** — **`name`, `subCategoryId`, or `type`** changed. Gets a brand-new `ruleGroupId`, `version: 1`, no `supersedesId`, no `effectiveTo` (a separate lineage, not a closed date range). The new lineage's initial `status` **inherits** the old lineage's pre-supersede status. The **old** lineage's current row is **force-set to `cancelled`** — terminal, unlike `deprecated`. `description` or `instrumentId` changing alone is non-breaking — a new version in the same lineage, like amount/schedule.
 
 ```ts
 interface RecurringRule {
@@ -127,7 +146,8 @@ interface RecurringRule {
   name: string;                   // chain-breaking if changed
   description?: string;
   type: 'income' | 'expense';      // chain-breaking if changed
-  categoryId: string;               // chain-breaking if changed ("tag")
+  subCategoryId: string;            // chain-breaking if changed ("tag"); category derived
+  instrumentId?: string;            // versions, doesn't break chain; pre-fills completed occurrences
 
   amount: number;                   // versions, doesn't break chain
   repeats: 'monthly' | 'quarterly' | 'yearly';
@@ -160,7 +180,9 @@ Per rule group, for a target month:
 
 This design is what makes a chain-break trivial: the old (now `cancelled`) lineage contributes nothing from the moment it's cancelled, in *any* month, so there's no double-computation risk with the new lineage — no migration, no predecessor-chain lookup, no concurrency guard needed anywhere in this path, because nothing is ever written for a still-planned occurrence in the first place. A `Transaction` only ever exists in Dexie once it's real: an adhoc entry, or something completed.
 
-**Annual Summary note**: since planned occurrences are computed, not stored, an FY aggregate (§7) may build an in-memory (never persisted) cache across the 12 months it needs, purely to avoid recomputing the same month repeatedly — never a substitute for storage.
+**Amounts** (`features/transactions.feature`): a planned row records `plannedAmount`. Creating a row directly as completed with no rule behind it records `plannedAmount: 0` and `actualAmount` = the entered value. Completing a planned row, whether stored or virtual, keeps `plannedAmount`; `actualAmount` defaults to it unless edited. Moving back to planned clears `actualAmount` and leaves `plannedAmount` as it was. A virtual occurrence carries the rule version's `amount` as `plannedAmount`.
+
+**Annual Summary note**: rule occurrences are still never stored. The FY summary (§7) is a separate *derived* document: persisted, and recomputed by an event handler after every transaction or rule write. Rule occurrences only ever feed into that aggregate; none is ever written as a transaction.
 
 ---
 
@@ -176,10 +198,12 @@ src/
     Cashflow/              # MonthSelector, ProjectedBalanceCard, SummaryCard,
                             # TransactionSection (scrollable), TransactionRow
     Rules/                 # RuleSearchBar, RuleStatusFilterChips, RuleRow (scrollable list)
-    MasterData/            # CategoryGrid, CategoryCard
-    AnnualSummary/          # FiscalYearSelector, AnnualTotalsCard, MonthlyBreakdownChart,
-                            # CategoryBreakdownList
-    sheets/                 # TransactionFormSheet, RuleFormSheet, CategoryFormSheet
+    MasterData/            # TotalCategoriesCard, CategoryGrid, CategoryCard, PaymentModeList,
+                            # ArchivedToggle
+    AnnualSummary/          # FiscalYearSelector, AnnualTotalsCard, MonthlyBreakdownTable,
+                            # CategoryBreakdownTable
+    sheets/                 # TransactionFormSheet, RuleFormSheet, CategoryFormSheet (+ sub-categories),
+                            # InstrumentFormSheet
   stores/                  # Zustand: uiStore, transactionStore, ruleStore,
                             # metadataStore, annualSummaryStore
   services/                # TransactionService, RuleService, RuleEngineService,
@@ -232,15 +256,17 @@ graph TD
   MasterDataScreen --> CategoryGrid
   CategoryGrid --> CategoryCard
   MasterDataScreen --> AddCategoryButton
+  MasterDataScreen --> PaymentModeList
 
   AnnualSummaryScreen --> FiscalYearSelector
   AnnualSummaryScreen --> AnnualTotalsCard
-  AnnualSummaryScreen --> MonthlyBreakdownChart
-  AnnualSummaryScreen --> CategoryBreakdownList
+  AnnualSummaryScreen --> MonthlyBreakdownTable
+  AnnualSummaryScreen --> CategoryBreakdownTable
 
   SheetHost --> TransactionFormSheet
   SheetHost --> RuleFormSheet
   SheetHost --> CategoryFormSheet
+  SheetHost --> InstrumentFormSheet
 ```
 
 Shared primitives: `Card`, `Pill`, `IconBadge`, `BottomSheet`, `FormField`, `SelectField`, `ToggleGroup`, `ChipInput`, `IconPicker`, `ColorPicker`, `Button`, `ScrollableList`.
@@ -288,7 +314,7 @@ interface TransactionRepository {
 
 ## 6. Persistence
 
-### 6.1 Dexie schema (v1)
+### 6.1 Dexie schema (v1 → v3)
 
 ```ts
 db.version(1).stores({
@@ -297,6 +323,18 @@ db.version(1).stores({
   metadataGroups: 'id, key, updatedAt',
   syncOutbox: '++localSeq, entityType, entityId, op, createdAt',
   monthCacheMeta: 'monthKey, lastAccessedAt',
+});
+
+// v2 — additive only
+db.version(2).stores({
+  fySummaries: 'fyStartYear, updatedAt',   // derived FY summary documents (§7); figures in cipherPayload
+});
+
+// v3 — leaf-only Master Data (§2.2): index the sub-category, not the category.
+// Index change only; v1 started from a clean database, so no data upgrade.
+db.version(3).stores({
+  transactions: 'id, monthKey, year, ruleId, ruleGroupId, subCategoryId, statusKind, updatedAt',
+  rules: 'id, ruleGroupId, status, subCategoryId, effectiveFrom, updatedAt',
 });
 ```
 
@@ -322,11 +360,19 @@ Firestore is the system of record; Dexie is a **working-set cache scoped to the 
 Confirmed. Added as a 4th bottom-nav tab. Content, modeled on the Cashflow screen's visual language:
 
 - **`FiscalYearSelector`** — `‹ FY 2026–27 ›`, April-to-March range.
-- **`AnnualTotalsCard`** — actual income, actual expense, net savings for the FY-to-date (hero card, same treatment as `ProjectedBalanceCard`).
-- **`MonthlyBreakdownChart`** — one bar (or paired income/expense bars) per month, Apr…Mar, actual amounts.
-- **`CategoryBreakdownList`** — top categories by actual spend for the FY, reusing `TransactionRow`-style rows.
+- **Definitions** — *Planned* = sum of `plannedAmount` over computed rule occurrences, saved planned transactions and completed transactions. A transaction completed with no prior plan contributes 0. *Committed* = sum of `actualAmount` over completed (`statusKind: 'actual'`) transactions only. Committed can therefore **exceed** planned (overspend, or unplanned spending). *Net* = income − expense, for each. The Cashflow cards use the same meaning: headline = committed, "Planned" subtext = planned. Projected balance counts each row's actual amount once completed, otherwise its planned amount.
+- **`AnnualTotalsCard`** — Income / Expense / Net rows, each with planned and committed, for the whole FY.
+- **`MonthlyBreakdownTable`** — one row per month Apr…Mar plus an FY total row; planned and committed for income, expense and net. Current month highlighted; tapping a row opens that month on Cashflow.
+- **`CategoryBreakdownTable`** — one row per top-level category (`MetadataGroup` with `key: 'category'`, archived ones included), split into Income and Expense sections with section totals; planned, committed and share-of-section %. Each category's figures are the sum of its sub-categories (derived parent). Ordered by planned descending; zero rows hidden; ids that resolve to nothing roll up into "Uncategorised".
 
-**Data layer**: `BalanceService.getAnnualSummary(fyStartYear)` aggregates 12 months of transactions. For a current-FY request, all months are already local. For a **prior-FY** request, months not cached locally are fetched from Firestore on demand (§6.3) and cached transiently for the session, then purged again on the next FY-rollover sweep like any other out-of-FY data.
+Behaviour is specified in `features/annual-summary.feature`.
+
+**Data layer — persisted, event-driven summary document**: the screen reads one `FiscalYearSummary` document per FY from `fySummaries` (encrypted like transactions, §8.1). The document holds 12 months × {income, expense} × {planned, committed}, plus per-type totals keyed by `subCategoryId`. Rolling sub-categories up to their category, and resolving names, icons and colours, happens at render. A leaf never changes parent, so this roll-up is stable, Master Data edits show without a recompute, and unknown ids roll into "Uncategorised".
+
+- `TransactionService`/`RuleService` emit a domain event (`services/domainEvents.ts`) after every successful write. The emit is **awaited**, so a write resolves only once the summary is current.
+- `FiscalYearSummaryService` handles those events. A transaction write recomputes the FY of the old and new date. A rule write (create/revise/status/delete) recomputes every stored FY plus the current FY, because a rule can shift occurrences in any year. The `list()` expiry stamp emits nothing, since it changes no occurrence.
+- Recompute = `BalanceService.buildAnnualSummary(fy)`: one rule read, one `getByMonthRange` over the FY, 12 × `computeVirtualPlannedTransactions` merged with stored rows (`mergeStoredWithVirtual`, shared with Cashflow), then the pure `summarizeFiscalYear`.
+- A missing document is built on first read. Documents are derived data and never enter `syncOutbox`; each device rebuilds its own. Prior-FY data comes from local storage only in v1 (the Firestore fetch in §6.3 is future work).
 
 ---
 
@@ -340,9 +386,9 @@ Dexie/IndexedDB can't query ciphertext, so encryption is **field-level**, not wh
 
 | Entity | Encrypted (`cipherPayload`) | Clear (stays indexed) |
 |---|---|---|
-| `Transaction` | `title`, `amount`, `notes` | `id`, `monthKey`, `year`, `categoryId`, `statusKind`, `ruleId`, `ruleGroupId`, `updatedAt` |
-| `RecurringRule` | `name`, `amount`, `description` | `id`, `ruleGroupId`, `version`, `categoryId`, `status`, `effectiveFrom`, `updatedAt` |
-| `MetadataGroup`/`MetadataItem` | — none | everything — no monetary figures, just labels |
+| `Transaction` | `title`, `plannedAmount`, `actualAmount`, `notes`, `instrumentId` | `id`, `monthKey`, `year`, `subCategoryId`, `statusKind`, `ruleId`, `ruleGroupId`, `updatedAt` |
+| `RecurringRule` | `name`, `amount`, `description`, `instrumentId` | `id`, `ruleGroupId`, `version`, `subCategoryId`, `status`, `effectiveFrom`, `updatedAt` |
+| `MetadataGroup`/`MetadataItem` | — none | everything — labels only. Instruments hold a nickname + last 4 digits, never a full card/account number (§2.2) |
 
 **Trade-off, explicitly flagged**: anyone with direct IndexedDB access can still see *which categories* you transacted in, *when*, and *how many* transactions — but not titles, amounts, or notes. Full-record encryption would hide categories/dates too, but would also make month/status queries impossible without decrypting the entire table on every read. This is the standard practical middle ground for an encrypted local-first app; flag it if you want full-record encryption instead (bigger change: every list query becomes decrypt-then-filter in memory).
 
@@ -399,10 +445,11 @@ Firebase Auth (Google Sign-In) will primarily gate the **Firestore sync boundary
 
 None outstanding.
 
-1. ✅ Chain-breaking fields confirmed: `name`, `categoryId`, `type`. `description` alone is non-breaking.
+1. ✅ Chain-breaking fields confirmed: `name`, `subCategoryId`, `type`. `description` or `instrumentId` alone is non-breaking.
 2. ✅ Annual Summary layout confirmed as proposed.
 3. ✅ No separate outbox-pruning concern — `syncOutbox` entries are deleted immediately on successful push (§5); eviction (§6.3) is entirely FY-boundary driven, not age-based.
 4. ✅ Local login confirmed as gate + encrypt-at-rest, alphanumeric passphrase (§8).
+5. ✅ Master Data (2026-10-01): status is fixed in code (no labels); transactions/rules store the sub-category and optional instrument only, with parents derived; archive-never-delete once used; type is independent of category; payment modes are fixed and system-defined, with user-managed instruments; payment info is descriptive only (no balances) in v1; no custom groups.
 
 ---
 

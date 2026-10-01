@@ -16,7 +16,7 @@ function rule(overrides: Partial<RecurringRule> = {}): RecurringRule {
     effectiveFrom: '2026-01-01',
     name: 'Rent',
     type: 'expense',
-    categoryId: 'cat-housing',
+    subCategoryId: 'cat-housing',
     amount: 24000,
     repeats: 'monthly',
     dayOfMonth: 5,
@@ -73,12 +73,12 @@ describe('computeVirtualPlannedTransactions (pure — no persistence at all)', (
 
     const feb = computeVirtualPlannedTransactions([oldVersion, newVersion], 2026, 2);
     expect(feb).toHaveLength(1);
-    expect(feb[0].amount).toBe(1000);
+    expect(feb[0].plannedAmount).toBe(1000);
     expect(feb[0].ruleId).toBe('r1');
 
     const may = computeVirtualPlannedTransactions([oldVersion, newVersion], 2026, 5);
     expect(may).toHaveLength(1);
-    expect(may[0].amount).toBe(1200);
+    expect(may[0].plannedAmount).toBe(1200);
     expect(may[0].ruleId).toBe('r2');
   });
 
@@ -122,7 +122,7 @@ describe('computeVirtualPlannedTransactions (pure — no persistence at all)', (
 const rent: CreateRuleInput = {
   name: 'Rent',
   type: 'expense',
-  categoryId: 'cat-housing',
+  subCategoryId: 'cat-housing',
   amount: 24000,
   repeats: 'monthly',
   dayOfMonth: 5,
@@ -140,9 +140,10 @@ describe('RuleEngineService.getExecutionInfo', () => {
     await transactionRepository.save({
       id: 'tx1',
       title: 'Rent',
-      amount: 24000,
+      plannedAmount: 24000,
+      actualAmount: 24000,
       type: 'expense',
-      categoryId: 'cat-housing',
+      subCategoryId: 'cat-housing',
       date: '2026-10-05',
       statusKind: 'actual',
       ruleId: created.id,

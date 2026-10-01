@@ -7,7 +7,7 @@ Feature: Recurring rule materialization
   Scenario: An active rule produces a computed planned occurrence
     Given an active rule that fires on the 5th of every month
     When I view a month it applies to
-    Then I see a planned transaction dated the 5th, with that rule's amount and category
+    Then I see a planned transaction dated the 5th, with that rule's amount, sub-category and payment instrument
     And no transaction record for it exists in storage yet
 
   Scenario: Revisiting the same month never duplicates the occurrence

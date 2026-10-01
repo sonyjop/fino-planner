@@ -1,0 +1,22 @@
+.screen {
+  padding-bottom: var(--space-6);
+}
+
+.subtitle {
+  color: var(--color-text-muted);
+  margin: -8px 0 var(--space-4);
+  font-size: 0.9rem;
+}
+
+.sectionTitle {
+  font-weight: 600;
+  font-size: 1rem;
+  margin: 0 0 var(--space-2);
+}
+
+.loading {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  text-align: center;
+  padding: var(--space-5) 0;
+}

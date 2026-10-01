@@ -5,16 +5,18 @@ export type TransactionStatusKind = 'planned' | 'actual';
 export interface Transaction {
   id: string;
   title: string;
-  amount: number;
+  /** What was planned. 0 when the transaction was created directly as completed (unplanned). */
+  plannedAmount: number;
+  /** What was actually paid/received. Set only while statusKind is 'actual'. */
+  actualAmount?: number;
   type: TransactionType;
-  categoryId: string; // -> MetadataGroup.id (a 'category'-key group)
+  /** -> MetadataItem.id under a 'category' group. The category itself is derived, never stored. */
+  subCategoryId: string;
   date: ISODateString; // auto = entry date unless changed
   /** Structural marker deciding planned vs. actual bucketing & balance math — not user metadata. */
   statusKind: TransactionStatusKind;
-  /** Display label only -> MetadataItem.id in the 'status' group (Planned/Partial/Paid/...). */
-  statusLabelId?: string;
-  accountId?: string; // -> MetadataItem.id in the 'account' group
-  paymentModeId?: string; // -> MetadataItem.id in the 'paymentMode' group
+  /** -> MetadataItem.id under a 'paymentMode' group. The payment mode itself is derived. */
+  instrumentId?: string;
   notes?: string;
   /** Exact rule VERSION that spawned this, for traceability. */
   ruleId?: string;

@@ -1,0 +1,26 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: none;
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+  text-align: left;
+  cursor: pointer;
+}
+
+.archived {
+  opacity: 0.55;
+}
+
+.name {
+  font-weight: 600;
+}
+
+.meta {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}

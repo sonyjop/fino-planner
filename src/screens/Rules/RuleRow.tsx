@@ -3,7 +3,7 @@ import type { RecurringRule } from '../../models/RecurringRule';
 import { RuleEngineService } from '../../services/RuleEngineService';
 import { useMetadataStore } from '../../stores/metadataStore';
 import { useUiStore } from '../../stores/uiStore';
-import { findCategoryGroup } from '../../utils/metadata';
+import { describeSubCategory } from '../../utils/metadata';
 import { formatCurrency } from '../../utils/currency';
 import { describeSchedule, formatDate } from '../../utils/rule';
 import styles from './RuleRow.module.css';
@@ -31,7 +31,6 @@ interface RuleRowProps {
 export default function RuleRow({ rule }: RuleRowProps) {
   const groups = useMetadataStore((s) => s.groups);
   const openSheet = useUiStore((s) => s.openSheet);
-  const category = findCategoryGroup(groups, rule.categoryId);
   const [execution, setExecution] = useState<{ lastExecutedDate?: string; nextDueDate?: string }>({});
 
   useEffect(() => {
@@ -50,7 +49,7 @@ export default function RuleRow({ rule }: RuleRowProps) {
         <span className={styles.amount}>{formatCurrency(rule.amount)}</span>
       </div>
       <div className={styles.subtitle}>
-        {category?.name ?? 'Uncategorized'} · {describeSchedule(rule)}
+        {describeSubCategory(groups, rule.subCategoryId)} · {describeSchedule(rule)}
       </div>
       <div className={styles.footer}>
         <span className={`${styles.statusChip} ${STATUS_CLASS[rule.status]}`}>

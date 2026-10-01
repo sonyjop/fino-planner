@@ -1,13 +1,15 @@
 import { create } from 'zustand';
 
 export type AppTab = 'cashflow' | 'rules' | 'masterData' | 'annualSummary';
-export type SheetType = 'transaction' | 'rule' | 'category';
+export type SheetType = 'transaction' | 'rule' | 'category' | 'instrument';
 export type SheetMode = 'create' | 'edit';
 
 export interface ActiveSheet {
   type: SheetType;
   mode: SheetMode;
   targetId?: string;
+  /** Create-mode parent, e.g. the payment mode a new instrument goes under. */
+  parentId?: string;
 }
 
 interface UiState {

@@ -1,8 +1,9 @@
+import CategoryFormSheet from '../screens/sheets/CategoryFormSheet';
+import InstrumentFormSheet from '../screens/sheets/InstrumentFormSheet';
 import RuleFormSheet from '../screens/sheets/RuleFormSheet';
 import TransactionFormSheet from '../screens/sheets/TransactionFormSheet';
 import { useUiStore } from '../stores/uiStore';
 
-// CategoryFormSheet lands when the Master Data screen is built.
 export default function SheetHost() {
   const activeSheet = useUiStore((s) => s.activeSheet);
   if (!activeSheet) return null;
@@ -12,6 +13,10 @@ export default function SheetHost() {
       return <TransactionFormSheet />;
     case 'rule':
       return <RuleFormSheet />;
+    case 'category':
+      return <CategoryFormSheet />;
+    case 'instrument':
+      return <InstrumentFormSheet />;
     default:
       return null;
   }

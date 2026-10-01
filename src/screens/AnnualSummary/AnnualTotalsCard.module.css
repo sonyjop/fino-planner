@@ -1,0 +1,39 @@
+.card {
+  margin-bottom: var(--space-5);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.table th,
+.table td {
+  padding: var(--space-2) 0;
+  text-align: right;
+}
+
+.table th:first-child {
+  text-align: left;
+}
+
+.table thead th {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.income {
+  color: var(--color-income);
+}
+
+.expense {
+  color: var(--color-expense);
+}
+
+.net th,
+.net td {
+  border-top: 1px solid #e4e7ef;
+  font-weight: 700;
+}

@@ -1,20 +1,12 @@
 import { format, parseISO } from 'date-fns';
 import IconBadge from '../../components/IconBadge';
-import Pill, { type PillTone } from '../../components/Pill';
 import type { Transaction } from '../../models/Transaction';
+import { effectiveAmount } from '../../services/BalanceService';
 import { useMetadataStore } from '../../stores/metadataStore';
 import { useUiStore } from '../../stores/uiStore';
 import { formatCurrency } from '../../utils/currency';
-import { findCategoryGroup, resolveItemLabel } from '../../utils/metadata';
+import { describeInstrument, resolveLeaf } from '../../utils/metadata';
 import styles from './TransactionRow.module.css';
-
-/** Seed status labels map to tones directly; anything custom falls back to 'planned'. */
-function toneForLabel(label: string | undefined): PillTone {
-  const key = label?.toLowerCase();
-  if (key === 'paid') return 'paid';
-  if (key === 'partial') return 'partial';
-  return 'planned';
-}
 
 interface TransactionRowProps {
   transaction: Transaction;
@@ -24,8 +16,10 @@ export default function TransactionRow({ transaction }: TransactionRowProps) {
   const groups = useMetadataStore((s) => s.groups);
   const openSheet = useUiStore((s) => s.openSheet);
 
-  const category = findCategoryGroup(groups, transaction.categoryId);
-  const statusLabel = resolveItemLabel(groups, 'status', transaction.statusLabelId);
+  // Only the leaves are stored; category and payment mode are derived (architecture.md §2.2).
+  const subCategory = resolveLeaf(groups, transaction.subCategoryId);
+  const category = subCategory?.group.key === 'category' ? subCategory.group : undefined;
+  const paidWith = describeInstrument(groups, transaction.instrumentId);
   const sign = transaction.type === 'income' ? '+' : '−';
 
   return (
@@ -37,14 +31,16 @@ export default function TransactionRow({ transaction }: TransactionRowProps) {
       <div className={styles.body}>
         <div className={styles.title}>{transaction.title}</div>
         <div className={styles.subtitle}>
-          {category?.name ?? 'Uncategorized'} · {format(parseISO(transaction.date), 'dd MMM')}
+          {category && subCategory ? `${category.name} › ${subCategory.item.label}` : 'Uncategorised'} ·{' '}
+          {format(parseISO(transaction.date), 'dd MMM')}
         </div>
       </div>
       <div className={styles.amountCol}>
         <div className={`${styles.amount} ${styles[transaction.type]}`}>
-          {sign} {formatCurrency(transaction.amount)}
+          {sign} {formatCurrency(effectiveAmount(transaction))}
         </div>
-        {statusLabel && <Pill tone={toneForLabel(statusLabel)}>{statusLabel}</Pill>}
+        {/* Upcoming/Completed sections already convey status, so the row shows how it's paid. */}
+        {paidWith && <span className={styles.instrument}>{paidWith}</span>}
       </div>
     </button>
   );

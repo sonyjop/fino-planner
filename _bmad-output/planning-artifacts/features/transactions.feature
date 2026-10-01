@@ -2,6 +2,10 @@ Feature: Transactions
   A transaction's status can move freely between Planned and Completed in
   either direction — not a one-way "mark as paid" — and can be set directly at
   creation time. All edits happen through a bottom sheet.
+  a transactiomn should record both planned amount and actual amount.
+  A transaction records a sub-category (its category is derived from it) and,
+  optionally, a payment instrument (its payment mode is derived from it).
+  Status has exactly two values, Planned and Completed. (master-data.feature)
 
   Background:
     Given I am unlocked and viewing a month in Cashflow
@@ -11,28 +15,24 @@ Feature: Transactions
     Then the due date defaults to today's date
 
   Scenario: Adding a transaction as still-planned (the default)
-    When I fill in title, amount, category, and type, leave Status as "Planned", and save
+    When I fill in title, amount, sub-category, and type, leave Status as "Planned", and save
     Then it appears in the Upcoming section
 
   Scenario: Adding a transaction directly as already-completed
-    When I fill in title, amount, category, and type, set Status to "Completed", and save
+    When I fill in title, amount, sub-category, and type, set Status to "Completed", and save
     Then it appears in the Completed section immediately, with no separate "mark as paid" step
+    also it will record its planned amount = 0 and actual amount = the user entered value
 
   Scenario: Completing a still-planned transaction
     Given a transaction is in the Upcoming section
     When I open it, set Status to "Completed", and save
-    Then it moves to the Completed section
+    Then it moves to the Completed section by recording planned and actual accordingly.
+    default actual amount is planned unless user manual changes it.
 
   Scenario: Undoing a completed transaction back to planned
     Given a transaction is in the Completed section
     When I open it, set Status back to "Planned", and save
     Then it moves back to the Upcoming section
-
-  Scenario: A status label is a cosmetic tag, independent of the structural status
-    Given I am editing a transaction that is still "Planned"
-    When I pick "Partial" as the status label without toggling Status to "Completed"
-    Then it still appears under Upcoming, now tagged "Partial"
-    And no separate amount-paid tracking is created — it is a label only
 
   Scenario: Editing a transaction's date to a different month moves it
     Given a transaction belongs to the currently viewed month

@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
+import AnnualSummaryScreen from '../screens/AnnualSummary/AnnualSummaryScreen';
 import CashflowScreen from '../screens/Cashflow/CashflowScreen';
+import MasterDataScreen from '../screens/MasterData/MasterDataScreen';
 import RulesScreen from '../screens/Rules/RulesScreen';
 import { useMetadataStore } from '../stores/metadataStore';
 import { useUiStore, type AppTab } from '../stores/uiStore';
@@ -13,7 +15,6 @@ const TABS: { id: AppTab; label: string }[] = [
   { id: 'annualSummary', label: 'Summary' },
 ];
 
-// Master Data / Annual Summary screens land in their own phases; Cashflow and Rules are real.
 export default function AppShell() {
   const activeTab = useUiStore((s) => s.activeTab);
   const setActiveTab = useUiStore((s) => s.setActiveTab);
@@ -28,11 +29,8 @@ export default function AppShell() {
       <main className={styles.content}>
         {activeTab === 'cashflow' && <CashflowScreen />}
         {activeTab === 'rules' && <RulesScreen />}
-        {activeTab !== 'cashflow' && activeTab !== 'rules' && (
-          <p className={styles.placeholder}>
-            {TABS.find((t) => t.id === activeTab)?.label} screen — built in a later phase.
-          </p>
-        )}
+        {activeTab === 'annualSummary' && <AnnualSummaryScreen />}
+        {activeTab === 'masterData' && <MasterDataScreen />}
       </main>
 
       <nav className={styles.bottomNav}>

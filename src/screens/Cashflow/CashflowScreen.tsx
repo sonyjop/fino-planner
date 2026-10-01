@@ -45,14 +45,14 @@ export default function CashflowScreen() {
         <SummaryCard
           title="Income"
           tone="income"
-          actual={summary.income.actual}
-          planned={summary.income.total}
+          actual={summary.income.committed}
+          planned={summary.income.planned}
         />
         <SummaryCard
           title="Expenses"
           tone="expense"
-          actual={summary.expenses.actual}
-          planned={summary.expenses.total}
+          actual={summary.expenses.committed}
+          planned={summary.expenses.planned}
         />
       </div>
 
